@@ -3,7 +3,7 @@
 a simple interpreter only could handle `digit+digit`
 '''
 
-EOF, PLUS, INTEGER = "EOF", "PLUS", "INTEGER"
+EOF, OP, INTEGER = 'EOF', 'OP', 'INTEGER'
 
 
 class Token(object):
@@ -43,9 +43,10 @@ class Interpreter(object):
             while self.pos < len(self.text) and self.text[self.pos].isdigit():
                 self.pos += 1
             return Token(INTEGER, int(self.text[anchor: self.pos]))
-        elif current_char == '+':
+        elif current_char == '+' or current_char == '-':
             self.pos += 1
-            return Token(PLUS)
+            return Token(OP, (lambda x, y: x + y) if current_char == '+'
+                         else (lambda x, y: x - y))
         else:
             self.error()
 
@@ -62,11 +63,12 @@ class Interpreter(object):
 
         left = self.current_token
         self.eat(INTEGER)
-        self.eat(PLUS)
+        op = self.current_token
+        self.eat(OP)
         right = self.current_token
         self.eat(INTEGER)
 
-        return left.value + right.value
+        return op.value(left.value, right.value)
 
 
 def main():
