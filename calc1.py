@@ -12,6 +12,12 @@ class Token(object):
         self.token_type = token_type
         self.value = value
 
+    def __str__(self):
+        return "<Token %s, %s>" % (self.token_type, self.value)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class Interpreter(object):
     def __init__(self, text):
@@ -24,13 +30,19 @@ class Interpreter(object):
 
     def get_next_token(self):
 
+        while self.pos < len(self.text) and self.text[self.pos].isspace():
+            self.pos += 1
+
         if self.pos > len(self.text) - 1:
             return Token(EOF)
 
         current_char = self.text[self.pos]
         if current_char.isdigit():
+            anchor = self.pos
             self.pos += 1
-            return Token(INTEGER, int(current_char))
+            while self.pos < len(self.text) and self.text[self.pos].isdigit():
+                self.pos += 1
+            return Token(INTEGER, int(self.text[anchor: self.pos]))
         elif current_char == '+':
             self.pos += 1
             return Token(PLUS)
@@ -60,7 +72,7 @@ class Interpreter(object):
 def main():
     while True:
         try:
-            text = input('calc>')
+            text = input('calc>').strip()
         except EOFError:
             break
         if not text:
