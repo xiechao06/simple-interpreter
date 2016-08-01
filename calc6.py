@@ -1,12 +1,13 @@
 #! /usr/bin/env python3
 """
-expr := factor ( op factor )*
-op := *|/
-factor := integer
+expr := term ( (+|-) term )*
+term := factor ( (*|/) term) )*
+factor := integer | \( expr \)
 """
 import operator
 
-EOF, OP, INTEGER = 'EOF', 'OP', 'INTEGER'
+(EOF, PLUS, MINUS, MUL, DIV, INTEGER, LPAREN, RPAREN) = (
+    'EOF', 'PLUS', 'MINUS', 'MUL', 'DIV', 'INTEGER', '(', ')')
 
 
 class Token(object):
@@ -25,6 +26,22 @@ class Token(object):
 
 
 class Lexer(object):
+
+    token_type_map = {
+        '+': PLUS,
+        '-': MINUS,
+        '*': PLUS,
+        '/': DIV,
+        '(': LPAREN,
+        ')': RPAREN,
+    }
+
+    op_value_map = {
+        '+': operator.add,
+        '-': operator.sub,
+        '*': operator.mul,
+        '/': operator.truediv,
+    }
 
     def __init__(self, text):
         self.text = text + '\0'
@@ -49,12 +66,10 @@ class Lexer(object):
         while self.text[pos] != '\0':
             pos = self.skip_spaces(pos)
             current_char = self.text[pos]
-            if current_char in {'+', '-', '*', '/'}:
+            if current_char in {'+', '-', '*', '/', '(', ')'}:
                 pos += 1
-                yield Token(OP, {
-                    '*': operator.mul,
-                    '/': operator.truediv
-                }[current_char])
+                yield Token(self.token_type_map[current_char],
+                            self.op_value_map.get(current_char))
             elif current_char.isdigit():
                 [value, pos] = self.integer(pos)
                 yield Token(INTEGER, value)
@@ -80,17 +95,30 @@ class Interpreter(object):
             self.error()
 
     def factor(self):
-        ret = self.current_token.value
-        self.eat(INTEGER)
+        if self.current_token.type == INTEGER:
+            ret = self.current_token.value
+            self.eat(INTEGER)
+        else:
+            self.eat(LPAREN)
+            ret = self.expr()
+            self.eat(RPAREN)
         return ret
 
-    def expr(self):
+    def term(self):
         result = self.factor()
-
-        while self.current_token.type == OP:
+        while self.current_token.type in {MUL, DIV}:
             op = self.current_token
-            self.eat(OP)
+            self.eat(self.current_token.type)
             result = op.value(result, self.factor())
+
+        return result
+
+    def expr(self):
+        result = self.term()
+        while self.current_token.type in {PLUS, MINUS}:
+            op = self.current_token
+            self.eat(self.current_token.type)
+            result = op.value(result, self.term())
         return result
 
 

@@ -1,12 +1,13 @@
 #! /usr/bin/env python3
 """
-expr := factor ( op factor )*
-op := *|/
+expr := term ( (+|-) term )*
+term := factor ( (*|/) term) )*
 factor := integer
 """
 import operator
 
-EOF, OP, INTEGER = 'EOF', 'OP', 'INTEGER'
+EOF, PLUS, MINUS, MUL, DIV, INTEGER = ('EOF', 'PLUS', 'MINUS', 'MUL', 'DIV',
+                                       'INTEGER')
 
 
 class Token(object):
@@ -49,12 +50,18 @@ class Lexer(object):
         while self.text[pos] != '\0':
             pos = self.skip_spaces(pos)
             current_char = self.text[pos]
-            if current_char in {'+', '-', '*', '/'}:
+            if current_char == '+':
                 pos += 1
-                yield Token(OP, {
-                    '*': operator.mul,
-                    '/': operator.truediv
-                }[current_char])
+                yield Token(PLUS, operator.add)
+            elif current_char == '-':
+                pos += 1
+                yield Token(MINUS, operator.sub)
+            elif current_char == '*':
+                pos += 1
+                yield Token(MUL, operator.mul)
+            elif current_char == '/':
+                pos += 1
+                yield Token(DIV, operator.truediv)
             elif current_char.isdigit():
                 [value, pos] = self.integer(pos)
                 yield Token(INTEGER, value)
@@ -84,13 +91,21 @@ class Interpreter(object):
         self.eat(INTEGER)
         return ret
 
-    def expr(self):
+    def term(self):
         result = self.factor()
-
-        while self.current_token.type == OP:
+        while self.current_token.type in {MUL, DIV}:
             op = self.current_token
-            self.eat(OP)
+            self.eat(self.current_token.type)
             result = op.value(result, self.factor())
+
+        return result
+
+    def expr(self):
+        result = self.term()
+        while self.current_token.type in {PLUS, MINUS}:
+            op = self.current_token
+            self.eat(self.current_token.type)
+            result = op.value(result, self.term())
         return result
 
 
