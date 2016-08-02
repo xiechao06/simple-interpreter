@@ -30,7 +30,7 @@ class Lexer(object):
     token_type_map = {
         '+': PLUS,
         '-': MINUS,
-        '*': PLUS,
+        '*': MUL,
         '/': DIV,
         '(': LPAREN,
         ')': RPAREN,
@@ -124,8 +124,10 @@ class Parser(object):
         else:
             self.error()
 
-    def factor(self):
+    def error(self):
+        raise Exception("unexpected token: " + str(self.current_token))
 
+    def factor(self):
         if self.current_token.type == INTEGER:
             ret = Num(self.current_token.value)
             self.eat(INTEGER)
@@ -136,10 +138,12 @@ class Parser(object):
             }[self.current_token.type]
             self.eat(self.current_token.type)
             ret = UnaryOp(op, self.expr())
-        else:
+        elif self.current_token.type == LPAREN:
             self.eat(LPAREN)
             ret = self.expr()
             self.eat(RPAREN)
+        else:
+            self.error()
         return ret
 
     def term(self):
