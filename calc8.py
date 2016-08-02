@@ -78,24 +78,45 @@ class Lexer(object):
         yield Token(EOF)
 
 
+class Node(object):
+    pass
+
+
+class Num(Node):
+
+    def __init__(self, value):
+        self.value = value
+
+
+class BinOp(Node):
+
+    def __init__(self, op, left, right):
+        self.op = op
+        self.left = left
+        self.right = right
+
+    @property
+    def value(self):
+        return self.op(self.left.value, self.right.value)
+
+
+class UnaryOp(Node):
+
+    def __init__(self, op, child):
+
+        self.op = op
+        self.child = child
+
+    @property
+    def value(self):
+        return self.op(self.child.value)
+
+
 class Parser(object):
 
     def __init__(self, lexer):
         self.tokens = lexer.tokens
         self.current_token = next(self.tokens)
-
-    def factor(self):
-
-        if self.current_token.type == INTEGER:
-            ret = {
-                'value': self.current_token.value
-            }
-            self.eat(INTEGER)
-        else:
-            self.eat(LPAREN)
-            ret = self.expr()
-            self.eat(RPAREN)
-        return ret
 
     def eat(self, token_type):
         if self.current_token.type == token_type:
@@ -103,30 +124,40 @@ class Parser(object):
         else:
             self.error()
 
+    def factor(self):
+
+        if self.current_token.type == INTEGER:
+            ret = Num(self.current_token.value)
+            self.eat(INTEGER)
+        elif self.current_token.type in {PLUS, MINUS}:
+            op = {
+                PLUS: operator.pos,
+                MINUS: operator.neg,
+            }[self.current_token.type]
+            self.eat(self.current_token.type)
+            ret = UnaryOp(op, self.expr())
+        else:
+            self.eat(LPAREN)
+            ret = self.expr()
+            self.eat(RPAREN)
+        return ret
+
     def term(self):
 
         node = self.factor()
         while self.current_token.type in {MUL, DIV}:
-            op = self.current_token
+            op = self.current_token.value
             self.eat(self.current_token.type)
-            node = {
-                'left': node,
-                'value': op.value,
-                'right': self.factor()
-            }
+            node = BinOp(op, node, self.factor())
 
         return node
 
     def expr(self):
         node = self.term()
         while self.current_token.type in {PLUS, MINUS}:
-            op = self.current_token
+            op = self.current_token.value
             self.eat(self.current_token.type)
-            node = {
-                'left': node,
-                'value': op.value,
-                'right': self.term(),
-            }
+            node = BinOp(op, node, self.term())
         return node
 
 
@@ -135,15 +166,8 @@ class Interpreter(object):
     def __init__(self, tree):
         self.__tree = tree
 
-    def is_leaf(self, node):
-        return 'left' not in node
-
     def visit(self, node):
-        if self.is_leaf(node):
-            return node['value']
-        else:
-            return node['value'](self.visit(node['left']),
-                                 self.visit(node['right']))
+        return node.value
 
     def interpret(self):
         return self.visit(self.__tree)
